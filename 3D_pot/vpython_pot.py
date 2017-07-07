@@ -2,15 +2,31 @@ from visual import *
 from visual.graph import gcurve
 import time
 import threading
+import random
+try:
+    import ADC_values as adc
 
+    setup = adc.Boards()
+    values = setup.getvalues()
+
+except Exception as e:
+    print e
+    setup = None
+    values = []
 
 sceneobj = []
 sensors = []
-values = []
+labels = []
+sizethreads = [None for i in range(1,13)]
+
 length, radius = 5,5
 sm = 2
 size_inc = 0.1
 framerate = 100
+update_interval = 2
+max_size = 1.5
+
+values = [random.randint(0,5) for i in range(1, 13)]
 
 def normalize():
     for i in sceneobj:
@@ -18,7 +34,24 @@ def normalize():
             i.radius = sm
 
 def getvalue(id):
-    return 0
+    if not values:
+        print "No values"
+        return -1
+    else:
+        print "failing id? : " + str(id)
+        print values
+        return values[id]
+
+def changevaluelabel(id):
+
+    setlabel(id,"ABEL %d:\nValue:%0.1f" % (id, getvalue(id)))
+    print "setttin label: " + str(id) + "to " + str(getvalue(id))
+
+def setlabel(id,string):
+    if not labels:
+        print "No labels"
+    else:
+        labels[id].text = string
 
 def removeobject(i,obj):
     obj.visible = False
@@ -39,19 +72,19 @@ def createRingoballs(height,sm_rad = 1,rad = radius):
     else:
         sensid = len(sensors)
 
-    label(pos = (rad,labelpos,0), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid)))
+    labels.append(label(pos = (rad,labelpos,0), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid += 1
     s1 = sphere(pos=(rad, height, 0), radius=sm_rad, color=color.green)
 
-    label(pos=(0, labelpos, -rad), text="ABEL %d" % sensid)
+    labels.append(label(pos=(0, labelpos, -rad), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid +=1
     s2 = sphere(pos=(0, height, -rad), radius=sm_rad, color=color.green)
 
-    label(pos=(0, labelpos, rad), text="ABEL %d" % sensid)
+    labels.append(label(pos=(0, labelpos, rad), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid +=1
     s3 = sphere(pos=(0, height, rad), radius=sm_rad, color=color.green)
 
-    label(pos=(-rad, labelpos, 0), text="ABEL %d" % sensid)
+    labels.append(label(pos=(-rad, labelpos, 0), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid +=1
     s4 = sphere(pos=(-rad, height, 0), radius=sm_rad, color=color.green)
 
@@ -62,14 +95,14 @@ def createRingoballs(height,sm_rad = 1,rad = radius):
 
     return list
 
-class sizeThread(threading.Thread):
+class checksizeThread(threading.Thread):
     def __init__(self):
-        super(sizeThread,self).__init__()
+        super(checksizeThread, self).__init__()
 
     def run(self):
       while 1:
           for i in sensors:
-              if i.radius > 4:
+              if i.radius > max_size:
                   i.color = color.red
               else:
                   i.color = color.green
@@ -79,9 +112,18 @@ class setsizeThread(threading.Thread):
         super(setsizeThread,self).__init__()
         self.id = id
         self.newsize = newsize
+        self.prev = None
+
     def run(self):
+        print "started changing size, but waiting"
+        if self.prev !=None:
+            self.prev.join()
+        print " done waiting"
         print "change size of " + str(self.id)
         settoradius(sensors[self.id], self.newsize)
+
+    def setprev(self,thr):
+        self.prev = thr
 
 def getCylinder():
     for i,val in enumerate(sceneobj):
@@ -97,6 +139,7 @@ def getObject(obj):
             return i, val
     print "no item found..."
     return -1,-1
+
 def grow(obj,finalsize):
     while obj.radius < finalsize:
         rate(framerate)
@@ -137,17 +180,37 @@ def increasecylinder(old,newlength):
 # for i,index in enumerate(change):
 #      top.append(sphere(pos = change[i], radius = 2, color = color.green))
 
+def createthreads():
+    for i in range(0,12):
+        t = setsizeThread(i,1)
+        sizethreads[i] = t
+
+def update(intval):
+    for i in range(0,12):
+    #labels updaten
+        changevaluelabel(i)
+    #straal updaten
+        thr = setsizeThread(i,getvalue(i))
+        thr.start()
+        thr.setprev(sizethreads[i])
+        sizethreads[i] = thr
+
+    time.sleep(intval)
 
 
 def createscene(name):
-    d = display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 1, 1))
+    d = display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 0, 1))
     d.stereo = 'active'
     createRingoballs(0,rad=2)
     createRingoballs(0)
     createRingoballs(length)
-
     increasecylinder(None, length)
-    sizeThread().start()
+    checksizeThread().start()
+
+
+    print "updating"
+    update(update_interval)
+
 
 
 
@@ -168,4 +231,6 @@ def changecamera():
 
 if __name__== "__main__":
     createscene("Billy")
-
+    while 1:
+        values = [random.uniform(0, 2) for i in range(1, 13)]
+        update(update_interval)
