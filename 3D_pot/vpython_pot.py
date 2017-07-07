@@ -1,16 +1,29 @@
 from visual import *
+from visual.graph import gcurve
 import time
 import threading
-sceneobj = []
-sensors= []
-length, radius = 5,5
-sm_rad = 2
-def createscene(name):
-    display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 1, 1))
 
-def removeobject(obj):
+
+sceneobj = []
+sensors = []
+values = []
+length, radius = 5,5
+sm = 2
+size_inc = 0.1
+framerate = 100
+
+def normalize():
+    for i in sceneobj:
+        if isinstance(i,sphere):
+            i.radius = sm
+
+def getvalue(id):
+    return 0
+
+def removeobject(i,obj):
     obj.visible = False
     del obj
+    del sceneobj[i]
 
 
 def createCylinder(length= 5):
@@ -18,31 +31,35 @@ def createCylinder(length= 5):
     sceneobj.append(c)
     return c
 
-def createRingoballs(height,sm_rad = 1):
+def createRingoballs(height,sm_rad = 1,rad = radius):
+
     labelpos = height + sm_rad
     if not sensors:
         sensid = 0
     else:
         sensid = len(sensors)
-    label(pos = (radius,labelpos,0), text ="sensor %d" % sensid)
+
+    label(pos = (rad,labelpos,0), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid)))
     sensid += 1
-    s1 = sphere(pos=(radius, height, 0), radius=sm_rad, color=color.green)
+    s1 = sphere(pos=(rad, height, 0), radius=sm_rad, color=color.green)
 
-    label(pos=(0, labelpos, -radius), text="sensor %d" % sensid)
+    label(pos=(0, labelpos, -rad), text="ABEL %d" % sensid)
     sensid +=1
-    s2 = sphere(pos=(0, height, -radius), radius=sm_rad, color=color.green)
+    s2 = sphere(pos=(0, height, -rad), radius=sm_rad, color=color.green)
 
-    label(pos=(0, labelpos, radius), text="sensor %d" % sensid)
+    label(pos=(0, labelpos, rad), text="ABEL %d" % sensid)
     sensid +=1
-    s3 = sphere(pos=(0, height, radius), radius=sm_rad, color=color.green)
+    s3 = sphere(pos=(0, height, rad), radius=sm_rad, color=color.green)
 
-    label(pos=(-radius, labelpos, 0), text="sensor %d" % sensid)
+    label(pos=(-rad, labelpos, 0), text="ABEL %d" % sensid)
     sensid +=1
-    s4 = sphere(pos=(-radius, height, 0), radius=sm_rad, color=color.green)
+    s4 = sphere(pos=(-rad, height, 0), radius=sm_rad, color=color.green)
 
-    list = s1,s2,s3,s4
-    [sceneobj.append(x) for x in list]
-    [sensors.append(x) for x in list]
+    temp = s1,s2,s3,s4
+    [sceneobj.append(x) for x in temp]
+    [sensors.append(x) for x in temp]
+    total  = zip(sensors,values)
+
     return list
 
 class sizeThread(threading.Thread):
@@ -66,32 +83,30 @@ class setsizeThread(threading.Thread):
         print "change size of " + str(self.id)
         settoradius(sensors[self.id], self.newsize)
 
-class shrinkThread(threading.Thread):
-    def __init__(self,list):
-        super(shrinkThread,self).__init__()
-        self.list = list
-
-    def run(self):
-        print "Started thread to shrink"
-        settoradius(self.list[3], 1)
-        print "Done shrinking"
-        inccylmultiple()
-        createRingoballs(10)
-
 def getCylinder():
-    for i in sceneobj:
-        if isinstance(i,cylinder):
-            return i
+    for i,val in enumerate(sceneobj):
+        if isinstance(val,cylinder):
+            return i,val
+            pass
+    print "no item found..."
+    return -1,-1
+
+def getObject(obj):
+    for i, val in enumerate(sceneobj):
+        if val == obj:
+            return i, val
+    print "no item found..."
+    return -1,-1
 def grow(obj,finalsize):
     while obj.radius < finalsize:
-        rate(100)
-        obj.radius += 0.01
+        rate(framerate)
+        obj.radius += size_inc
 
 
 def shrink(obj,finalsize):
     while obj.radius > finalsize:
-        rate(100)
-        obj.radius -= 0.01
+        rate(framerate)
+        obj.radius -= size_inc
 
 
 def settoradius(obj,rad):
@@ -99,34 +114,58 @@ def settoradius(obj,rad):
         shrink(obj,rad)
     else:
         grow(obj,rad)
-def inccylmultiple():
-    c = getCylinder()
-    oax = c.axis[1]
-    increasecylinder(c,oax + length)
+
+def addlevel():
+    i,c = getCylinder()
+    if i == -1:
+        oax = 0
+    else:
+        oax = c.axis[1]+length
+    print "length cylinder : "  + str(oax)
+    increasecylinder(c,oax )
+    createRingoballs(oax)
 
 def increasecylinder(old,newlength):
-    removeobject(old)
+    i,c = getObject(old)
+    if i != -1:
+        removeobject(i, c)
+
     createCylinder(newlength)
+
 
 # change = [(x.x,length,x.z) for x in bottom]
 # for i,index in enumerate(change):
 #      top.append(sphere(pos = change[i], radius = 2, color = color.green))
 
-createscene("billy-billy")
-c = createCylinder(length)
-bottom, top = createRingoballs(0), createRingoballs(length)
 
 
+def createscene(name):
+    d = display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 1, 1))
+    d.stereo = 'active'
+    createRingoballs(0,rad=2)
+    createRingoballs(0)
+    createRingoballs(length)
 
-while 1:
-    shrinkThread(top).start()
+    increasecylinder(None, length)
     sizeThread().start()
-    for i,item in enumerate(sensors):
-        setsizeThread(i,4).start()
-        time.sleep(1)
-    for i,item in enumerate(sensors):
-        setsizeThread(i,2).start()
-        time.sleep(1)
 
-# grow(bottom[2],3)
-# shrink(bottom[2],1)
+
+
+def pulse():
+    while 1:
+        for i,val in enumerate(sensors):
+            setsizeThread(i,4).start()
+            time.sleep(0.5)
+        changecamera()
+        addlevel()
+        for i,val in enumerate(sensors):
+            setsizeThread(i,1).start()
+            time.sleep(0.5)
+
+
+def changecamera():
+    d = display.get_selected()
+
+if __name__== "__main__":
+    createscene("Billy")
+
