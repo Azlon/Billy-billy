@@ -30,7 +30,7 @@ size_inc = 0.01         #incrementatie van de straal van de bollen in update()
 framerate = 50          #bovengrens van loop uitvoering / seconde
 update_interval = 2     #update interval
 max_size = 2            #Maximale waarde waarvoor de bollen nog steeds groen uitslaan
-multiplier = 10         #Vergroten van sensorwaarden, indien de straal aanpassing niet zichtbaaar is.
+multiplier = 1.5         #Vergroten van sensorwaarden, indien de straal aanpassing niet zichtbaaar is.
 
 def normalize():
     """
@@ -331,7 +331,7 @@ def createscene(name):
     d = display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 0, 1))
     d.stereo = 'active'
     createRingoballs(0,rad=2)
-    createRingoballs(0)
+    createRingoballs(2.5)
     createRingoballs(length)
     increasecylinder(None, length)
     checksizeThread().start()
