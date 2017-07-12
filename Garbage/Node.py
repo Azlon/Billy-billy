@@ -2,11 +2,10 @@ import random as rand
 
 class Node:
     def __init__(self,maxvalue = 1):
-        self.location = None
         self.humitity =0
         self.activated = False
         self.bretheren = []
-        self.id = rand.randint(0,20)
+        self.id = 0
         self.maxvalue = maxvalue
 
     def getvalue(self):
@@ -27,14 +26,11 @@ class Node:
     def __add__(self, other):
         return [other,self]
 
-    def __str__(self):
-        return "Node at " + str(self.location)
-
     def printstatus(self):
-        print "Node " + str(id) + "has a humidity reading of " + str(self.humitity)
+        print "Node " + str(self.id) + " has a humidity reading of " + str(self.humitity)
 
 class Level:
-    def __init__(self,stage = 1,maxtotal = 20):
+    def __init__(self,stage = 1,maxtotal = 12):
         self.stage = stage
         self.nodes = []
         self.levelvalues = []
@@ -86,9 +82,9 @@ class Level:
         return sumnodes
 
 
-class BillyPot:
+class Pot:
 
-    def __init__(self, count=20,levels= 5):
+    def __init__(self, count=12,levels= 3):
         self.levelcount = levels
         self.levels = []
 

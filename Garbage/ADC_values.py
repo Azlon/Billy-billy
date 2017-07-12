@@ -24,7 +24,7 @@ class sensthread(threading.Thread):
         Runnen van de thread : sequentieel spanning opmeten van kanalen
         :return:
         """
-        intval =
+
         #Per intverval of continu?
         try:
             for i in range(1,9):
@@ -67,11 +67,11 @@ class Boards:
         :return:
         """
         if id == 1:
-            self.b1.__address = adr1
-            self.b1.__address = adr2
+            self.adc1.__address = adr1
+            self.adc1.__address = adr2
         elif id == 2:
-            self.b2.__address = adr1
-            self.b2.__address = adr2
+            self.adc2.__address = adr1
+            self.adc2.__address = adr2
         else:
             print "Maar twee borden beschikbaar (verander ID)"
 
@@ -87,4 +87,5 @@ class Boards:
         Starten van de thread
         :return:
         """
-        sensthread.start()
+        s = sensthread(self.values,self.b1,self.b2)
+        s.start()

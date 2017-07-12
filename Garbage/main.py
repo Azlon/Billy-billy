@@ -1,17 +1,9 @@
-
+import vpython_pot as pot
 ##setup code?
 ##Fetch code
 ##Process code
 ##plot van data
-##testen van sensor waarden op geldigheid?
+##testen van sensor_adafruit waarden op geldigheid?
 ##sturing van de sensoren? (aanzetten / uitschakelen)?
 ##communicatie protocol implementeren?
 
-num_nodes = 20
-num_levels = 5
-
-
-
-
-if __name__ == "__main__":
-    pass
