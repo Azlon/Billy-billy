@@ -2,15 +2,202 @@ try:
     #8 kanaal ADC
     from Drivers.ABEL import ADCPi
     from Drivers.ABEL import ABEHelpers
-    #Licht en temperatuur
-    from Drivers.ADA.Adafruit_ADS1x15 import ADS1x15,Adafruit_I2C
+    #Licht en temperatuur - ADAFRUIT = OUD, ADS = Nieuw
+    # from Drivers.ADA.Adafruit_ADS1x15 import ADS1x15,Adafruit_I2C
+    from Drivers.ADA.Adafruit_ADS1x15.ADS1x15 import ADS1115
     #Load cell ADC
     from Drivers.HX711 import hx711
+    import RPi.GPIO as GPIO
 except ImportError as e:
     print e
 
 import json
 import time
+
+#todo: superklass mksjson klopt?
+
+class Sensor(object):
+    def __init__(self,name,vallist = None):
+        if vallist and isinstance(list,vallist):
+            self.values = vallist
+        else:
+            self.values = []
+        self.name = name
+        self.dict = dict(values= self.values, name = self.name)
+
+    def conv(self,val):
+        return val
+
+    def read(self):
+        pass
+
+    def getvalues(self):
+        self.read()
+        for i in self.values:
+            self.values[i] = self.conv(i)
+
+    def mkjson(self):
+        return json.dumps(self.dict)
+
+    def __str__(self):
+        return self.mkjson()
+
+class I2CSensor(Sensor):
+    def __init__(self,name, vallist = None, adds = None):
+        super(I2CSensor, self).__init__(vallist,name,)
+        self.channels = []
+        if vallist and isinstance(list,adds):
+            self.adds = adds
+        else:
+            self.adds = []
+
+        try:
+            self.helper = ABEHelpers()
+            self.bus = self.helper.get_smbus()
+
+
+        except Exception as e:
+            print e
+
+
+
+    def setaddress(self,adds):
+        self.adds = adds
+    def getaddress(self):
+        return self.adds
+    def addaddress(self,add):
+        self.adds.append(add)
+    def extaddress(self,adds):
+        self.adds.extend(adds)
+
+    def mkjson(self):
+        self.dict = self.dict.update(dict(addresses =  self.adds))
+        return self.mkjson()
+
+class GPIOSensor(Sensor):
+    def __init__(self,name,vallist = None, mode = None, pins = None):
+        super(GPIOSensor, self).__init__(vallist,name)
+        self.mode = mode
+        self.pins = pins
+        if self.mode:
+            self.setmode("BCM")
+        else:
+            self.setmode("BOARD")
+        if self.pins:
+            self.pin = []
+
+    def setmode(self,mode):
+        if mode == "BCM":
+            self.mode =  self.mode = GPIO.setmode(GPIO.BSM)
+        elif  mode == "BOARD":
+            self.mode = self.mode = GPIO.setmode(GPIO.BOARD)
+
+    def setpin(self,*args):
+        self.pins = args
+
+    def mkjson(self):
+        self.dict = self.dict.update(dict(pins = self.pins, mode= self.mode, driver = "RPi"))
+        return self.mkjson()
+
+class Humidity(I2CSensor):
+    def __init__(self, name, vallist = None, adds = None,max = 5):
+        super(Humidity, self).__init__(name,vallist,adds)
+        self.max_volt = max
+        adds = [0x68,0x69,0x6C,0x6D]
+        self.setaddress(adds)
+
+        self.adc1 = ADCPi(self.bus, self.adds[0], self.adds[1], 12)
+        self.adc2 = ADCPi(self.bus, self.adds[2], self.adds[2], 12)
+
+    def read(self):
+        '''
+        leest spanning van ABEL adc en schrijft in list
+        :return:
+        '''
+        tval = []
+        for i in range(0, 8):
+            tval.append(self.adc1.read_voltage(i + 1))
+        for i in range(0, 4):
+            tval.append(self.adc2.read_voltage(i + 1))
+        self.values = tval
+        return tval
+
+    def mkjson(self):
+        self.dict = self.dict.update(dict(driver = "ABEL"))
+        return self.mkjson()
+
+class Light(I2CSensor):
+    def __init__(self, name, vallist = None, adds = None):
+        super(Light, self).__init__(name,vallist,adds)
+        self.driver = ADS1115()
+        self.adds = [0x48]
+
+
+
+    def read(self):
+        tval = []
+        front, back = self.driver.read_adc(3),self.driver.read_adc(1)
+        tval.append(front)
+        tval.append(back)
+        self.values = tval
+        return tval
+
+    def mkjson(self):
+        self.dict = self.dict.update(dict(driver = "ADS1x15"))
+        return self.mkjson()
+
+class Temperature(I2CSensor):
+    def __init__(self, name ,vallist = None, adds = None):
+        super(Temperature, self).__init__(name, vallist, adds)
+        self.driver = ADS1115()
+
+    def read(self):
+        tval = []
+        temp = self.driver.read_adc(0)
+        tval.append(temp)
+        self.values = tval
+        return tval
+
+    def conv(self,mvolt):
+        # This conversion is not accurate!!
+
+        try:
+            # volt = millivolt / 1000
+
+            # formula found on http://emant.com/316002.page
+            # this formula is not accurate!!
+            # lux = -(((2500 / volt) - 500) / 3.3) + 40000
+
+            lux = (mvolt / 50) * 10000
+            return abs(lux)
+        except Exception as e:
+            print "Light conversion error; " + str(e)
+
+    def mkjson(self):
+        self.dict = self.dict.update(driver = "ADS1x15")
+
+class Weight(GPIOSensor):
+    def __init__(self,name,vallist = None, mode = None, pins = None):
+        super(Weight, self).__init__(name,vallist,mode,pins)
+        self.pins = [19,26]
+        # pinnen staan naast elkaar , naast ground
+        self.amp = hx711.HX711(self.pins[0],self.pins[1])
+
+        # referentie is nog niet geweten
+        self.amp.set_reference_unit(1)
+
+    def getweight(self):
+        if len(self.values)>1:
+            raise Exception("Only one weight value expected")
+        return self.getvalues()[0]
+
+    def read(self,times = 3):
+        tval = []
+        self.values.append(self.amp.get_weight(times))
+
+    def calibrate(self):
+        pass
+
 
 class SensorManager:
     """
