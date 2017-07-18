@@ -1,7 +1,7 @@
-import random
-import threading
-import time
-import json
+import threading, time
+import jsonrw
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider,Button
 from visual import *
 
 # try:
@@ -19,18 +19,28 @@ from visual import *
 sceneobj = []
 sensors = []
 labels = []
+tlabel = None
 history = []
 sizethreads = [None for i in range(1,13)]
 values = [0 for i in range(1,13)]
 
+
 #---global parameters-----#
 length, radius = 5,5    #lengte en straal van de cilinder
 sm = 2                  #default straal van de bollen
+bg = 4                  #maximale straal van de bollen
+max_volt = 5
 size_inc = 0.01         #incrementatie van de straal van de bollen in update()
 framerate = 50          #bovengrens van loop uitvoering / seconde
 update_interval = 2     #update interval
 max_size = 2            #Maximale waarde waarvoor de bollen nog steeds groen uitslaan
-multiplier = 1.5         #Vergroten van sensorwaarden, indien de straal aanpassing niet zichtbaaar is.
+multiplier = 1.1
+
+closed = False
+pauzed = False
+
+#3D object methoden
+
 
 def normalize():
     """
@@ -40,6 +50,7 @@ def normalize():
     for i in sceneobj:
         if isinstance(i,sphere):
             i.radius = sm
+
 
 def getvalue(id):
     '''
@@ -65,6 +76,7 @@ def changevaluelabel(id):
     setlabel(id,"ABEL %d:\nValue:%0.1f" % (id, getvalue(id)))
     print "settting label: " + str(id) + "to " + str(getvalue(id))
 
+
 def setlabel(id,string):
     '''
     Aanpassen van de label array
@@ -79,8 +91,7 @@ def setlabel(id,string):
         labels[id].text = string
 
 
-
-def removeobject(i,obj):
+def removeobject(i, obj):
     '''
     Verwijder de models uit het plane en array
     :param i:
@@ -92,7 +103,7 @@ def removeobject(i,obj):
     del sceneobj[i]
 
 
-def createCylinder(length= 5):
+def createcylinder(length= 5):
     '''
     Maakt telkens eeen cilinder met een bepaalde lengte
     :param length: lengte van de cilinder
@@ -102,20 +113,34 @@ def createCylinder(length= 5):
     sceneobj.append(c)
     return c
 
-def definestaticradia(val_sens):
+
+def getcylinder():
     '''
-    Past de straal van elke bol met de waarden in val_sens lijst aan.
-    :param val_sens: Lijst met alle corresponderende sensorwaarden
+    Verkrijg de index en cilinder object uit de lijst
+    :return: tuple van lijstindex en cilinderobject
+    '''
+    for i,val in enumerate(sceneobj):
+        if isinstance(val,cylinder):
+            return i,val
+            pass
+    print "no item found..."
+    return -1,-1
+
+def inccylinder(old, newlength):
+    '''
+    Verwijdert de vorige cilinder uit de ruimten en plaatst een nieuwe grotere cilinder in de plaats
+    :param old:
+    :param newlength:
     :return:
     '''
-    global values
-    values = [i*multiplier for i in val_sens]
+    i,c = getobj(old)
+    if i != -1:
+        removeobject(i, c)
 
-    for index,item in enumerate(val_sens):
-        changevaluelabel(index)
-        sensors[index].radius = item * multiplier
+    createcylinder(newlength)
 
-def createRingoballs(height,sm_rad = 1,rad = radius):
+
+def createringoballs(height, sm_rad = 1, rad = radius):
     '''
     Maakt een ring van bollen op een zekere hoogte en met een zekere straal.
     :param height: Hoogte van plaatsing bollen
@@ -123,6 +148,7 @@ def createRingoballs(height,sm_rad = 1,rad = radius):
     :param rad: straal van de ring
     :return: tuple lijst van ballen en sensorwaarden
     '''
+
     labelpos = height + sm_rad
     if not sensors:
         sensid = 0
@@ -139,11 +165,11 @@ def createRingoballs(height,sm_rad = 1,rad = radius):
 
     labels.append(label(pos=(-rad, labelpos, 0), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid +=1
-    s4 = sphere(pos=(-rad, height, 0), radius=sm_rad, color=color.green)
+    s3 = sphere(pos=(-rad, height, 0), radius=sm_rad, color=color.green)
 
     labels.append(label(pos=(0, labelpos, rad), text ="ABEL %d:\nValue:%0.1f" % (sensid,getvalue(sensid))))
     sensid +=1
-    s3 = sphere(pos=(0, height, rad), radius=sm_rad, color=color.green)
+    s4 = sphere(pos=(0, height, rad), radius=sm_rad, color=color.green)
 
 
     temp = s1,s2,s3,s4
@@ -153,12 +179,13 @@ def createRingoballs(height,sm_rad = 1,rad = radius):
 
     return total
 
-class checksizeThread(threading.Thread):
+
+class SizeThr(threading.Thread):
     '''
     Thread om op elk moment de straal van de bollen na te gaan op het overschrijden van een maximale straal
     '''
     def __init__(self):
-        super(checksizeThread, self).__init__()
+        super(SizeThr, self).__init__()
 
     def run(self):
       while 1:
@@ -168,7 +195,8 @@ class checksizeThread(threading.Thread):
               else:
                   i.color = color.green
 
-class setsizeThread(threading.Thread):
+
+class SetsizeThr(threading.Thread):
     '''
     Laat de bollen krimpen / groeien volgens de waarden die in de 'values' lijst aanwezig zijn.
     '''
@@ -179,7 +207,7 @@ class setsizeThread(threading.Thread):
         :param id: SensorID
         :param newsize: nieuwe straal van bol
         '''
-        super(setsizeThread,self).__init__()
+        super(SetsizeThr, self).__init__()
         self.id = id
         self.newsize = newsize
         self.prev = None
@@ -196,19 +224,8 @@ class setsizeThread(threading.Thread):
     def setprev(self,thr):
         self.prev = thr
 
-def getCylinder():
-    '''
-    Verkrijg de index en cilinder object uit de lijst
-    :return: tuple van lijstindex en cilinderobject
-    '''
-    for i,val in enumerate(sceneobj):
-        if isinstance(val,cylinder):
-            return i,val
-            pass
-    print "no item found..."
-    return -1,-1
 
-def getObject(obj):
+def getobj(obj):
     '''
     Zoek een bepaald object in de lijst
     :param obj:
@@ -219,6 +236,7 @@ def getObject(obj):
             return i, val
     print "no item found..."
     return -1,-1
+
 
 def grow(obj,finalsize):
     '''
@@ -256,37 +274,27 @@ def settoradius(obj,rad):
     else:
         grow(obj,rad)
 
+
 def addlevel():
     '''
     Voeg een nieuwe ring van bollen toe bovenop de vorige
     :return:
     '''
-    i,c = getCylinder()
+    i,c = getcylinder()
     if i == -1:
         oax = 0
     else:
         oax = c.axis[1]+length
     print "length cylinder : "  + str(oax)
-    increasecylinder(c,oax )
-    createRingoballs(oax)
+    inccylinder(c, oax)
+    createringoballs(oax)
 
-def increasecylinder(old,newlength):
-    '''
-    Verwijdert de vorige cilinder uit de ruimten en plaatst een nieuwe grotere cilinder in de plaats
-    :param old:
-    :param newlength:
-    :return:
-    '''
-    i,c = getObject(old)
-    if i != -1:
-        removeobject(i, c)
-
-    createCylinder(newlength)
 
 
 # change = [(x.x,length,x.z) for x in bottom]
 # for i,index in enumerate(change):
 #      top.append(sphere(pos = change[i], radius = 2, color = color.green))
+
 
 def createthreads():
     '''
@@ -294,8 +302,9 @@ def createthreads():
     :return:
     '''
     for i in range(0,12):
-        t = setsizeThread(i,1)
+        t = SetsizeThr(i, 1)
         sizethreads[i] = t
+
 
 def addtohistory():
     '''
@@ -303,6 +312,7 @@ def addtohistory():
     :return:
     '''
     history.append(values)
+
 
 def update(intval):
     '''
@@ -314,12 +324,26 @@ def update(intval):
     #labels updaten
         changevaluelabel(i)
     #straal updaten
-        thr = setsizeThread(i,getvalue(i))
+        thr = SetsizeThr(i, getvalue(i))
         thr.start()
         # thr.setprev(sizethreads[i])
         sizethreads[i] = thr
     addtohistory()
     time.sleep(intval)
+
+
+def definestaticradia(val_sens):
+    '''
+    Past de straal van elke bol met de waarden in val_sens lijst aan.
+    :param val_sens: Lijst met alle corresponderende sensorwaarden
+    :return:
+    '''
+    global values
+    values = [i*multiplier for i in val_sens]
+
+    for index,item in enumerate(val_sens):
+        changevaluelabel(index)
+        sensors[index].radius = item * multiplier
 
 
 def createscene(name):
@@ -330,15 +354,17 @@ def createscene(name):
     '''
     d = display(title=name, x=0, y=0, center=(0, 0, 0), background=(0, 0, 1))
     d.stereo = 'active'
-    createRingoballs(0,rad=2)
-    createRingoballs(2.5)
-    createRingoballs(length)
-    increasecylinder(None, length)
-    checksizeThread().start()
+
+    threading.Thread(target = keycallback, args = [d]).start()
+
+    createringoballs(0, rad=2)
+    createringoballs(length / 2)
+    createringoballs(length)
+    inccylinder(None, length)
+    SizeThr().start()
+
     # print "updating"
     # update(update_interval)
-
-
 
 
 def pulse():
@@ -348,13 +374,42 @@ def pulse():
     '''
     while 1:
         for i,val in enumerate(sensors):
-            setsizeThread(i,4).start()
+            SetsizeThr(i, 4).start()
             time.sleep(0.5)
         changecamera()
         addlevel()
         for i,val in enumerate(sensors):
-            setsizeThread(i,1).start()
+            SetsizeThr(i, 1).start()
             time.sleep(0.5)
+
+
+def keycallback(*e):
+    global closed
+    while 1:
+        k = e[0].kb.getkey()
+        print k
+        if k == "ctrl+s":
+            print "open plot"
+            closed = False
+
+
+def handle_closed(e):
+    global closed
+    print "closed figure"
+    closed = True
+
+
+def pauze(e):
+    global pauzed
+    pauzed = not pauzed
+
+
+def chintval(val):
+    global update_interval
+    print "Slider changed to " + str(val)
+    update_interval = val
+    # update_interval = slider.val
+    # amp = slider.val
 
 
 def playback(filename, intval=1):
@@ -364,29 +419,106 @@ def playback(filename, intval=1):
     :param intval: tijd tussen opeenvolgende straal aannpassingen
     :return: Lijst van alle dictionnaries
     '''
+    global update_interval,tlabel
+    update_interval = intval
 
-    total = []
+    #complete lijsten
+    loghum=[]
+    logtemp = []
+    loglight = []
+    logmass = []
+    x = []
+    axhum = []
+
+    #lijst van json strings
+
+    total =  jsonrw.playback(filename)
+    print total
     try:
-        with open(filename, 'r') as file:
-            for line in file:
-                print line
-                jline = json.loads(line)
-                definestaticradia(jline['value'])
-                total.append(jline)
-                time.sleep(intval)
-        print total
-        return total
+        i = 0
+        start = time.time()
+        plt.ion()
+        axint = plt.axes([0, .97, .8, 0.03])
+        axbutt = plt.axes([0.9, .90, .1, 0.05])
 
+        sint = Slider(axint, 'Speed', 1, 10, valinit=1)
+        sint.on_changed(chintval)
+        butt = Button(axbutt,"Pauze")
+        butt.on_clicked(pauze)
+
+        f = plt.figure(1)
+        fh = plt.figure(2)
+
+        f.canvas.mpl_connect('close_event', handle_closed)
+
+        ax1 = f.add_subplot(221)
+        ax2 = f.add_subplot(222)
+        ax3 = f.add_subplot(223)
+
+        ax3.set(title = "Weight Sensor",xlabel = "Time", ylabel ="Kg")
+        ax2.set(title = "Light Sensors", xlabel = "Time", ylabel = "lux")
+        ax1.set(title = "Temperature",xlabel = "Time", ylabel = "C")
+        ax1.set_ylim([0,30])
+        ax2.set_ylim([0,1000])
+
+        for i in range(0, 4):
+            for j in range(0, 3):
+                index = (i) * 3 + (j)
+                t = fh.add_subplot(3, 4, index)
+                t.set_xlabel("Time")
+                t.set_ylabel("Voltage(V)")
+                t.set_title("Sensor: " + str(index))
+                axhum.append(t)
+        stop = time.time()
+
+        print "Setup took : " + str(stop-start) + " seconds"
+        for line in total:
+            print line
+            i  = i + 1
+            x.append(i)
+            hum = line['Sensors'][0]['values']
+            light =line['Sensors'][1]['values']
+            temp =line['Sensors'][2]['values']
+            mass = line['Sensors'][3]['values']
+            ctime = line['Time']
+            tlabel = label(pos = (0,-5,0), text ="Time: %s\n" % (ctime))
+
+            definestaticradia(hum)
+            logtemp.append(temp)
+            loglight.append(light)
+            logback,logfront = zip(*loglight)
+            back,front = light
+            logmass.append(mass)
+            loghum.append(hum)
+
+            ax1.scatter(i, temp)
+            ax2.scatter(i, front, marker='v', color='r')
+            ax2.scatter(i, back, marker='^', color='r')
+            ax3.scatter(i, mass)
+
+            for index,item in enumerate(axhum):
+                item.scatter(i,hum[index])
+            while pauzed:
+                plt.pause(0.001)
+            plt.pause(1/update_interval)
+            #definestaticradia(jline['value'])
+            # time.sleep(intval)
+            # else:
+            #     print "entered else clause"
+
+        print "end of file"
+        plt.close('all')
     except Exception as e:
+        plt.close()
         print e
+
 
 def changecamera():
     d = display.get_selected()
 
 if __name__== "__main__":
+
     createscene("Billy")
-    # playback("D:\VakantieJob 2017\Implementatie\3D_pot\Values.txt")
-    playback("Values.txt")
-    # while 1:
-    #     values = [random.uniform(0, 2) for i in range(1, 13)]
-    #     update(update_interval)
+    # playback("D:\VakantieJob 2017\Implementatie\Graphic_Billy_Billy\Values.txt")
+    playback("data.log")
+

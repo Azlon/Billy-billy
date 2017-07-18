@@ -1,15 +1,11 @@
-import capture_humidity
-import humidity_server
-import random
+import os
+import time
+
+import plotly
 import plotly.plotly as py
 import plotly.tools as tools
-from plotly.graph_objs import Scatter, Layout, Figure,Heatmap
-import plotly
-import time
-import datetime
-import os
-class plot:
-    pass
+from plotly.graph_objs import Scatter, Figure
+from Graphic_Billy_Billy.SensorManager import SensorManager
 
 class plotly_pot:
     def __init__(self,user=None):
@@ -29,13 +25,13 @@ class plotly_pot:
                              'awjk1nulrr',
                              'kurmyxjs6i',
                              'aykdpu63ku']
+
             self.plot_cred = dict(username=user, api_key=api_key, stream_tokens=stream_tokens)
         else:
             self.plot_cred = plotly.tools.get_credentials_file()
 
-        self.man = capture_humidity.SensorManager()
+        self.man = SensorManager()
         self.streams = []
-        self.serverthread = humidity_server.serverThread(self.man).start()
 
     def checkCredentialsfile(self):
         if os.path.exists('/home/pi/.plotly/.credentials'):
@@ -54,8 +50,9 @@ class plotly_pot:
             Create a subplots with al the sensorvalues (12 streaming tokens needed)
             :return: plotly figure object
             '''
+
             self.checkCredentialsfile()
-            size = self.man.getsizesensorlist()
+            size = 12
             titles = tuple("Sensor " + str(i+1) for i in range(0,size))
             fig = tools.make_subplots(rows = rows, cols = cols,subplot_titles=titles)
             for i in range(0,rows):
@@ -76,6 +73,7 @@ class plotly_pot:
             pass
 
     def openStreams(self):
+
             fig = self.createFigure(3,4)
             print "figure made for sensors"
             wfig = Figure(data = [self.createwFigure()])
@@ -107,9 +105,10 @@ class plotly_pot:
 
                 while True:
                     t = time.strftime("%H:%M:%S")
-                    for index, value in enumerate(self.man.getvalues()):
+                    print "self.man.getValByID(0): " + str(self.man.getValByID(0))
+                    for index, value in enumerate(self.man.getValByID(0)):
                         self.streams[index].write({'x': t, 'y': value})
-                    self.streams[12].write({'x': t, 'y': self.man.getweight()})
+                    self.streams[12].write({'x': t, 'y': self.man.getValByID(3)})
 
                     #heatmap
                     # level = self.man.getvalues()[8:12]
