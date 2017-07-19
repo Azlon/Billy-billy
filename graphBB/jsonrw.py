@@ -1,6 +1,6 @@
 import time,json, datetime, random
 import psutil
-import billylogger as log
+import genlogger as log
 from SensorManager import SensorManager
 
 class JsonRW:
@@ -11,10 +11,12 @@ class JsonRW:
     '''
 
     def __init__(self):
+
         '''
         Initiate the python logger, the sensormanager that encapsulates the sensor readings, the names of the files from
         which data should be read/written and the interval between subsequent samples
         '''
+
         #intialise default logger
         self.logger = log.ParentHandler()
         self.sensman = SensorManager()
@@ -30,7 +32,8 @@ class JsonRW:
         #setup actual logger
         self.logger.configLogger()
         self.logger.info('Name of the logger file is \''+ self.fnw + '\'',False)
-
+        self.logger.info("Setted home directory to : " + log.HOMEFOLDER,False)
+        self.logger.info("Setted log directory to: " + log.LOGFILENAME,False)
 
 
     def setlogname(self,name):
@@ -127,11 +130,11 @@ class JsonRW:
         df = psutil.disk_usage('/').percent
         if rio == 10:
             if df < 20:
-                self.logger.info("Plenty of disk space left",False)
+                self.logger.info("Plenty of disk space left (" + str(df) + ')',False)
             elif df > 20 and df < 50:
                self.logger.info("Gettting more full : " + str (df) + "%",False)
             elif df> 50 and df < 90:
-                self.logger.warning("Disk space reaching limit")
+                self.logger.warning("Disk space reaching limit (" + str(df) + ')')
             elif df > 90:
                 self.logger.warning("No disk space left:" + str(df) + "%")
                 raise Exception("No disk space")

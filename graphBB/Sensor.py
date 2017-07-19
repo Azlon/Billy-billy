@@ -13,13 +13,14 @@ try:
 except ImportError as e:
     print e
 
+import logging
+logger = logging.getLogger('sensor.instance.log')
 
-#todo: mkjson fixen
 
 class Sensor(object):
     def __init__(self,name,vallist = None):
-        print "BASE SENSOR CLASS CALLED"
-        print name
+        # print "BASE SENSOR CLASS CALLED"
+        # print name
         if vallist and isinstance(vallist,list):
             self.values = vallist
         else:
@@ -27,7 +28,7 @@ class Sensor(object):
         self.name = name
 
         self.dict = dict(values= self.values, name = self.name)
-        print self.dict
+        # print self.dict
 
     def conv(self,val):
         return val
@@ -39,8 +40,7 @@ class Sensor(object):
         self.read()
         for index, item in enumerate(self.values):
             self.values[index] = self.conv(item)
-        print "Values:" + str(self.values)
-
+        # print "Values:" + str(self.values)
         self.dict["values"] = self.values
         #print self.dict
         return self.values
@@ -61,14 +61,15 @@ class I2CSensor(Sensor):
         else:
             self.adds = []
 
+        self.dict.update(dict(addresses=self.adds))
         try:
             self.helper = ABEHelpers()
             self.bus = self.helper.get_smbus()
 
 
         except Exception as e:
+            logger.critical('I2C sensor not properly instantiated: ' + str(e))
             print e
-        self.dict.update(dict(addresses=self.adds))
 
 
     def setaddress(self,adds):
@@ -101,11 +102,13 @@ class GPIOSensor(Sensor):
 class Humidity(I2CSensor):
     def __init__(self, name, vallist = None, adds = None,max = 5):
         super(Humidity, self).__init__(name,vallist,adds)
+
         self.max_volt = max
         self.setaddress([0x68,0x69,0x6C,0x6D])
         self.adc1 = ADCPi(self.bus, self.adds[0], self.adds[1], 12)
         self.adc2 = ADCPi(self.bus, self.adds[2], self.adds[2], 12)
         self.dict.update(dict(driver="ABEL"))
+
 
     def read(self):
         '''
@@ -118,17 +121,20 @@ class Humidity(I2CSensor):
         for i in range(0, 4):
             tval.append(self.adc2.read_voltage(i + 1))
         self.values = tval
-        print tval
+        # print tval
         return tval
 
 
 class Light(I2CSensor):
     def __init__(self, name, vallist = None, adds = None):
         super(Light, self).__init__(name,vallist,adds)
+
         self.driver = ADS1115()
         self.setaddress([0x48])
 
         self.dict.update(dict(driver="ADS1x15"))
+
+
 
     # def conv(self, mvolt):
     #     # This conversion is not accurate!!
@@ -159,6 +165,7 @@ class Temperature(I2CSensor):
         self.driver = ADS1115()
         self.setaddress([0x48])
         self.dict.update(driver="ADS1x15")
+
 
     def read(self):
         tval = []
@@ -193,12 +200,15 @@ class Temperature(I2CSensor):
 class Weight(GPIOSensor):
     def __init__(self,name,vallist = None, pins = None):
         super(Weight, self).__init__(name,vallist,pins)
-        self.setpin(19,26)
+
+        self.setpin(22,27)
         # pinnen staan naast elkaar , naast ground
         self.amp = hx711.HX711(self.pins[0],self.pins[1])
-
+        self.amp.set_reading_format("LSB", "MSB")
+        self.amp.set_reference_unit(183.33)
+        self.amp.reset()
+        self.amp.tare()
         # referentie is nog niet geweten
-        self.amp.set_reference_unit(1)
         self.dict.update(driver = "HX711")
         #print "DEBUG: init weight DICT " + str(self.dict)
 

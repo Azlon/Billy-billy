@@ -414,7 +414,7 @@ def chintval(val):
 
 def playback(filename, intval=1):
     '''
-    neemt de waarden uit een .txt file en past de straal van de corresponderende bollen aan.
+    neemt de waarden uit een  file en past de straal van de corresponderende bollen aan.
     :param filename: pad, ten opzichte van de uitvoering van python script.
     :param intval: tijd tussen opeenvolgende straal aannpassingen
     :return: Lijst van alle dictionnaries
@@ -431,13 +431,12 @@ def playback(filename, intval=1):
     axhum = []
 
     #lijst van json strings
-
     total =  jsonrw.playback(filename)
-    print total
+
     try:
         i = 0
         start = time.time()
-        plt.ion()
+
         axint = plt.axes([0, .97, .8, 0.03])
         axbutt = plt.axes([0.9, .90, .1, 0.05])
 
@@ -445,21 +444,37 @@ def playback(filename, intval=1):
         sint.on_changed(chintval)
         butt = Button(axbutt,"Pauze")
         butt.on_clicked(pauze)
-
         f = plt.figure(1)
         fh = plt.figure(2)
 
+
         f.canvas.mpl_connect('close_event', handle_closed)
+
+        # fig , axes = plt.subplots(2,2)
+        # titles = ["Weight Sensor","Light Sensors","Temperature"]
+        # ylabels = ["Kg","Lux","C"]
+        # xlabels = "Times" * 3
+        # print axes
+        # [ax[0].set(title = title, xlabel = xlabel,ylabel = ylabel) for ax,title,xlabel,ylabel in zip(axes,titles,xlabels,ylabels)]
+        # fig, axes = plt.subplots(nrows=6)
+        # styles = ['r-', 'g-', 'y-', 'm-', 'k-', 'c-']
+        # lines = [ax.plot(x, y, style)[0] for ax, style in zip(axes, styles)]
+        #       # axes[0].set_ylim([0,30])
+        # axes[1].set_ylim([0,1000])
+
 
         ax1 = f.add_subplot(221)
         ax2 = f.add_subplot(222)
         ax3 = f.add_subplot(223)
 
-        ax3.set(title = "Weight Sensor",xlabel = "Time", ylabel ="Kg")
-        ax2.set(title = "Light Sensors", xlabel = "Time", ylabel = "lux")
-        ax1.set(title = "Temperature",xlabel = "Time", ylabel = "C")
+        ax3.set(title = "Weight sensor",xlabel = "Time", ylabel ="Kg")
+        ax2.set(title = "Light sensor" , xlabel = "Time", ylabel = "lux")
+        ax1.set(title = "Temperature sensor" ,xlabel = "Time", ylabel = "C")
+
         ax1.set_ylim([0,30])
         ax2.set_ylim([0,1000])
+
+
 
         for i in range(0, 4):
             for j in range(0, 3):
@@ -469,13 +484,16 @@ def playback(filename, intval=1):
                 t.set_ylabel("Voltage(V)")
                 t.set_title("Sensor: " + str(index))
                 axhum.append(t)
-        stop = time.time()
 
+        stop = time.time()
         print "Setup took : " + str(stop-start) + " seconds"
+        plt.ion()
         for line in total:
             print line
             i  = i + 1
             x.append(i)
+
+            #each sensor has it's static place in the json string
             hum = line['Sensors'][0]['values']
             light =line['Sensors'][1]['values']
             temp =line['Sensors'][2]['values']
@@ -483,7 +501,10 @@ def playback(filename, intval=1):
             ctime = line['Time']
             tlabel = label(pos = (0,-5,0), text ="Time: %s\n" % (ctime))
 
+            #change spheres according to list (12 elements)
             definestaticradia(hum)
+
+            #complete lists, updated as progressing through playback
             logtemp.append(temp)
             loglight.append(light)
             logback,logfront = zip(*loglight)
@@ -491,20 +512,24 @@ def playback(filename, intval=1):
             logmass.append(mass)
             loghum.append(hum)
 
+            #plot points in a scatter fashion
+            # markers = ['-','v','^']
+            # colors  = ['b','r','r']
+            # [a.scatter(i,temp,marker = marker,color = color) for a,marker,color in zip(axes,markers,colors)]
+
             ax1.scatter(i, temp)
             ax2.scatter(i, front, marker='v', color='r')
             ax2.scatter(i, back, marker='^', color='r')
             ax3.scatter(i, mass)
-
             for index,item in enumerate(axhum):
                 item.scatter(i,hum[index])
+
+            #when paused, loop keeps waiting but GUI remains active
             while pauzed:
                 plt.pause(0.001)
+
+            #slider changes update interval
             plt.pause(1/update_interval)
-            #definestaticradia(jline['value'])
-            # time.sleep(intval)
-            # else:
-            #     print "entered else clause"
 
         print "end of file"
         plt.close('all')
@@ -517,8 +542,7 @@ def changecamera():
     d = display.get_selected()
 
 if __name__== "__main__":
-
     createscene("Billy")
-    # playback("D:\VakantieJob 2017\Implementatie\Graphic_Billy_Billy\Values.txt")
-    playback("data.log")
+    # playback("D:\VakantieJob 2017\Implementatie\graphBB\Values.txt")
+    playback("./log/data.log")
 
