@@ -1,19 +1,30 @@
-#temperature compensensatie via K25 = (Kt) / (1 + 0.019 (t - 25)
+'''
+nuttige links :
+    http://forum.arduino.cc/index.php?topic=203198.0
+    http://www.growcontrol.com/
+    https://www.reagecon.com/pdf/technicalpapers/Effect_of_Temperature_TSP-07_Issue3.pdf
 
-    #wat is de temperature compensation value voor de potgrond?
-    #uitgaan van lineaire compensatie
-    #conductiviteit van vochtigheidssensor nauwkeurig genoeg?
-    #zelf een aantal metingen nemen en best fit afleiden?
-    #= eigen TCV afleiden
-    #= plotten van de vochtigheids waarden alsof aarde altijd bij 25 °C gedijd
-    #conversie van conductiviteit naar siemens / cm heeft buffer vloeistof
-    #nodig en daarna spanningen interpoleren naar corresponderende geleidingswaarden
-#conversie van spanning naar siemens / cm
-#calibratie van de humitity / temperature en light sensor
-#
+basis :
+De conductiviteit van het water verandert bij temperatuurschommelingen
+door de grotere / kleinere dissociatie van water en verder oplossing van mineralen
+waardoor meer ionen vrijkomen.
+De standaard oplossing om de temperatuurschommeling te compenseren is
+door de conductiviteit bij een zekere temperatuur naar de conductiviteit van 25 C
+terug te brengen.
+Er zijn twee mogelijke manieren om te correleren: lineair of niet -lineair
+. Bij een niet lineaire correlatie tussen conductiviteit en temperatuur wordt
+er aangenomen dat voor elke incrementatie van temperatuur, de conductiviteit
+in verhouding zal toenemen. Uit voorgaande emperische waarnemingen is gebleken dat voor
+drinkwater dat de conductiviteit 2% verandert per graad C. (0.02 / C).
 
-import logging,numpy,time
+
+'''
+import logging
+import numpy
+import time
+
 from  graphBB.Sensor import Temperature,Humidity
+
 tsensor = Temperature("Core temperature")
 hsensor = Humidity("Humidity")
 
@@ -24,6 +35,7 @@ __LOGMAXBYTES__ = 50000
 class Compensation:
     def __init__(self):
         try:
+            #initialiseren van de logger
             self.corelog = logging.getLogger("core.temphumlog")
             self.corelog.setLevel(logging.DEBUG)
             rfl = logging.handlers.RotatingFileHandler(__LOGDIR__, max)
@@ -35,9 +47,10 @@ class Compensation:
 
     #todo: script schrijven om telkens humidity waarden terug te brengen naar die van 25 graden.
     def compensate(self,temp,hum):
+        #basis formule om de temperatuur naar 25 C terug te brengen
         return hum / (1 + self.tvc * (temp-25))
 
-    #opstellen van temperature/ conductiviteit formule
+    #opstellen van temperature/ conductiviteit coefficient
     def __calcTVCgraph(self,tflag = False,degree = 1):
         temp = []
         try:
@@ -63,6 +76,7 @@ class Compensation:
             return numpy.poly1d(z)
 
     def getgradient(self):
+        #process starten om coefficient te bepalen
         z = self.__calcTVCgraph()[0]
         if len(z) == 2:
             print "Linear approximation"
@@ -71,12 +85,16 @@ class Compensation:
         return z
 
     def main(self):
+        #toepassen van de coefficient op verdere metingen
         self.getgradient()
-        x = tsensor.getvalues()
-        y = hsensor.getvalues()
-        newy = self.compensate(x,y)
-        mes = "Compensated humidity (at {old} at {temp} degrees is {new}".format(old =y, temp = x, new = newy)
-        self.corelog.info(mes)
+        while 1:
+            x = tsensor.getvalues()
+            y = hsensor.getvalues()
+            newy = self.compensate(x,y)
+            mes = "Compensated humidity (at {old} at {temp} degrees is {new}".format(old =y, temp = x, new = newy)
+            self.corelog.info(mes)
+
+
 if __name__ == "__main__":
     c = Compensation()
     c.main()

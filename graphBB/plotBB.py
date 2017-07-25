@@ -1,19 +1,10 @@
-import threading, time
-import jsonrw
+import json
+import threading
+import time
+
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider,Button
 from visual import *
-
-# try:
-#     from Garbage import ADC_values as adc
-#
-#     setup = adc.Boards()
-#     values = setup.getvalues()
-#
-# except Exception as e:
-#     print e
-#     setup = None
-#     values = []
 
 #lists
 sceneobj = []
@@ -25,23 +16,23 @@ sizethreads = [None for i in range(1,13)]
 values = [0 for i in range(1,13)]
 
 
-#---global parameters-----#
-length, radius = 5,5    #lengte en straal van de cilinder
-sm = 2                  #default straal van de bollen
-bg = 4                  #maximale straal van de bollen
-max_volt = 5
-size_inc = 0.01         #incrementatie van de straal van de bollen in update()
-framerate = 50          #bovengrens van loop uitvoering / seconde
-update_interval = 2     #update interval
-max_size = 2            #Maximale waarde waarvoor de bollen nog steeds groen uitslaan
-multiplier = 1.1
+# ---global parameters----- #
+length, radius = 5,5    # lengte en straal van de cilinder
+sm = 2                  # default straal van de bollen
+bg = 4                  # maximale straal van de bollen
+max_volt = 5            # High level voltage
+size_inc = 0.01         # incrementatie van de straal van de bollen in update()
+framerate = 50          # bovengrens van loop uitvoering / seconde
+update_interval = 2     # update interval
+max_size = 1.5          # maximale waarde waarvoor de bollen nog steeds groen uitslaan
+max_plot = 200          # maximaal aantal punten die op 1 grafiek (axes) mag getekend worden
+max_speed = 10          # Maximale snelheid van playback, zoals ook afgebeeld op de slider
+multiplier = 1.1        # Factor om vochtigheidswaarden te vergroten zodat bol volumes zichtbaar worden
 
-closed = False
-pauzed = False
+closed = False          #flag om aan te duiden of grafiek gesloten is
+pauzed = False          # Flag om aan te duiden of grafiek gepauzeerd is
 
 #3D object methoden
-
-
 def normalize():
     """
     De straal van elke bol naar 'sm' aanpassen
@@ -74,7 +65,7 @@ def changevaluelabel(id):
     :return:
     '''
     setlabel(id,"ABEL %d:\nValue:%0.1f" % (id, getvalue(id)))
-    print "settting label: " + str(id) + "to " + str(getvalue(id))
+    #print "settting label: " + str(id) + "to " + str(getvalue(id))
 
 
 def setlabel(id,string):
@@ -200,7 +191,7 @@ class SetsizeThr(threading.Thread):
     '''
     Laat de bollen krimpen / groeien volgens de waarden die in de 'values' lijst aanwezig zijn.
     '''
-
+    #deprecated:
     def __init__(self,id,newsize):
         '''
 
@@ -295,7 +286,6 @@ def addlevel():
 # for i,index in enumerate(change):
 #      top.append(sphere(pos = change[i], radius = 2, color = color.green))
 
-
 def createthreads():
     '''
     Maak een lijst van threads aan.
@@ -339,6 +329,7 @@ def definestaticradia(val_sens):
     :return:
     '''
     global values
+
     values = [i*multiplier for i in val_sens]
 
     for index,item in enumerate(val_sens):
@@ -384,6 +375,11 @@ def pulse():
 
 
 def keycallback(*e):
+    """
+    calback dat uitgevoerd wordt als een keystroke gemaakt wordt in de vpython scene
+    :param e: keyevent
+    :return:
+    """
     global closed
     while 1:
         k = e[0].kb.getkey()
@@ -394,23 +390,169 @@ def keycallback(*e):
 
 
 def handle_closed(e):
+    """
+    callback telkens de grafieken gesloten worden
+    :param e: event
+    :return:
+    """
     global closed
     print "closed figure"
     closed = True
 
 
 def pauze(e):
+    """
+    callback telkens de pauze knop wordt ingedrukt.
+    :param e:
+    :return:
+    """
     global pauzed
     pauzed = not pauzed
 
 
 def chintval(val):
+    """
+    callback telkens de slider van waarde verandert
+    :param val:
+    :return:
+    """
+
     global update_interval
     print "Slider changed to " + str(val)
     update_interval = val
     # update_interval = slider.val
-    # amp = slider.val
+    # amp = sliderm.val
 
+def getJSON(fn):
+
+    """
+    Get the data file with the json strings and return the entire file as a list of dictionnaries
+    Only needs data file.
+    :param fn: filename
+    :return: totale lijst met jsons
+    """
+
+    total = []
+    try:
+        with open(fn, 'r') as file:
+            for line in file:
+                total.append(json.loads(line))
+                # time.sleep(intval)
+        return total
+    except Exception as e:
+        print e
+def functimer(func):
+    """
+    Decorator wrapper om te timen hoe lang een methode duurt voordat ze afgesloten wordt. Toepassen door
+    @functimer boven de methode te plaatsen
+    :param func: functie waarvan de uitvoeringstijd geweten wil worden.
+    :return:
+    """
+    def wrapper(*args):
+        start = time.time()
+        r = func(*args)
+        stop = time.time()-start
+        print "{method}() took {time} to execute".format(method = func.func_name,time = stop)
+        return r
+    return wrapper
+
+class PlotSensor:
+    """
+    Klasse om het aanmaken van axes en de bijhorende attributen te vergemakkelijken.
+    Instantieer door de bijhorende keywords mee te geven.
+    """
+    def __init__(self,**kwargs):
+        self.name = kwargs.get("name")
+        self.y = kwargs.get("y")
+        self.ax = kwargs.get("ax")
+        self.max = kwargs.get("max")
+        if not self.y:
+            self.y = [0] * self.max
+        self.x = range(self.max)
+        self.xlabel = kwargs.get("xlabel")
+        self.ylabel = kwargs.get("ylabel")
+        self.auto = kwargs.get("auto_plot")
+        print "auto flag: " + str(self.auto)
+        if not self.auto:
+            self.auto = False
+
+        self._configax()
+        self.plotobj = None
+        self.figure = kwargs.get("figure")
+        self.subflag = kwargs.get("subflag")
+
+
+    def _adjustax(self):
+        """
+        Pas de axes aan naarmate de punten geplot worden.
+        :return:
+        """
+        maxx = max(self.x)
+        minx = min(self.x)
+        maxy = max(self.y)
+        miny = min(self.y)
+        self.ax.set_xlim(0.9*minx,1.1*maxx)
+        self.ax.set_ylim(0.9*miny,1.1* maxy)
+
+    def plot(self,x,y):
+        """
+        Plot de x en y lijsten als scatter punten op het bijhorende axe object zoals ingesteld bij constructie van de
+        de klasse
+
+        :param x: lijst van x waarden (tijd)
+        :param y: lijst van y waarden (kg, lux,C,...)
+        :return:
+        """
+        try:
+            self._adjustax()
+            self.plotobj = self.ax.scatter(x, y)
+
+        except Exception as e:
+            print e
+
+    def incx(self):
+        """
+        Bijhouden van incrementaties en ervoor zorgen dat een maximaal aantal punten op de
+        grafiek getekend wordt.
+        :return:
+        """
+        t = self.x[-1]
+        self.x = self.x[1:]
+        self.x.append(t + 1)
+
+    def addy(self,y):
+        """
+        Voeg een punt van buitenaf toe aan de lijst. Afhankelijk van de auto_plot atttribuut wordt automatisch
+        de plot functie aangeroepen. auto_plot = False vereist nog een extra plot() call op instantie.
+        :param y:
+        :return:
+        """
+        self.incx()
+        self.y = self.y[1:]
+        self.y.append(y)
+        if self.auto:
+            self.plot(self.x,self.y)
+
+    def mark(self,*args):
+        pass
+
+    def remove(self):
+        """
+        Scatter plot telkens opnieuw verwijderen zodat slechts een aantal punten in de volgende
+         addy() calls op de grafiek getekend worden.
+        :return:
+        """
+        self.plotobj.remove()
+
+
+    @functimer
+    def _configax(self):
+        """
+        Configureren van de scatter plots met naam, xlabel, ylabel en titel zoals aangegeven bij constructie van de
+        klasse.
+        :return:
+        """
+        self.ax.set(title=self.name, xlabel=self.xlabel, ylabel = self.ylabel)
 
 def playback(filename, intval=1):
     '''
@@ -419,130 +561,110 @@ def playback(filename, intval=1):
     :param intval: tijd tussen opeenvolgende straal aannpassingen
     :return: Lijst van alle dictionnaries
     '''
+
     global update_interval,tlabel
     update_interval = intval
 
-    #complete lijsten
-    loghum=[]
-    logtemp = []
-    loglight = []
-    logmass = []
-    x = []
-    axhum = []
+    #activeren van interactive mode
+    plt.ion()
+
+    #lijst van gemaakte axes
+    plots = []
+    hplots = []
 
     #lijst van json strings
-    total =  jsonrw.playback(filename)
+    total = getJSON(filename)
+    start = time.time()
 
-    try:
-        i = 0
-        start = time.time()
+    #primaire figuur
+    f = plt.figure(1)
+    fh = plt.figure(2)
 
-        axint = plt.axes([0, .97, .8, 0.03])
-        axbutt = plt.axes([0.9, .90, .1, 0.05])
-
-        sint = Slider(axint, 'Speed', 1, 10, valinit=1)
-        sint.on_changed(chintval)
-        butt = Button(axbutt,"Pauze")
-        butt.on_clicked(pauze)
-        f = plt.figure(1)
-        fh = plt.figure(2)
-
-
-        f.canvas.mpl_connect('close_event', handle_closed)
-
-        # fig , axes = plt.subplots(2,2)
-        # titles = ["Weight Sensor","Light Sensors","Temperature"]
-        # ylabels = ["Kg","Lux","C"]
-        # xlabels = "Times" * 3
-        # print axes
-        # [ax[0].set(title = title, xlabel = xlabel,ylabel = ylabel) for ax,title,xlabel,ylabel in zip(axes,titles,xlabels,ylabels)]
-        # fig, axes = plt.subplots(nrows=6)
-        # styles = ['r-', 'g-', 'y-', 'm-', 'k-', 'c-']
-        # lines = [ax.plot(x, y, style)[0] for ax, style in zip(axes, styles)]
-        #       # axes[0].set_ylim([0,30])
-        # axes[1].set_ylim([0,1000])
+    #slider en button
+    axint = plt.axes([0.1, .97, .7, 0.03])
+    axbutt = plt.axes([0.9, .90, .1, 0.05])
+    sint = Slider(axint, 'Speed', 1, max_speed, valinit=1, valfmt = "%1.2f sample(s)/seconde")
+    sint.on_changed(chintval)
+    butt = Button(axbutt,"Pauze")
+    butt.on_clicked(pauze)
 
 
-        ax1 = f.add_subplot(221)
-        ax2 = f.add_subplot(222)
-        ax3 = f.add_subplot(223)
+    f.canvas.mpl_connect('close_event', handle_closed)
 
-        ax3.set(title = "Weight sensor",xlabel = "Time", ylabel ="Kg")
-        ax2.set(title = "Light sensor" , xlabel = "Time", ylabel = "lux")
-        ax1.set(title = "Temperature sensor" ,xlabel = "Time", ylabel = "C")
+    # plot objecten
+    pltw = PlotSensor(name = "Weight Sensor",ylabel = "Weight (gram) ",xlabel = "Time", max = max_plot, ax = f.add_subplot(221),auto_plot=True)
+    pltt = PlotSensor(name = "Temperature Sensor ",ylabel = "Temp (C)",xlabel = "Time", max = max_plot, ax = f.add_subplot(222),auto_plot=True)
+    pltl = PlotSensor(name = "Light Sensor ",ylabel = "Lux",xlabel = "Time", max = max_plot, ax = f.add_subplot(223),auto_plot=True)
 
-        ax1.set_ylim([0,30])
-        ax2.set_ylim([0,1000])
+    plots.extend([pltw,pltt,pltl])
 
+    # markeren van geldig interval waarin punten zich kunnen bevinden. (todo)
+    pltw.mark([0,10])
+    pltt.mark([10,30])
+    pltl.mark([0,1000])
 
+    #humidity sensoren toevoegen op een andere figuur
+    for i in range(0, 4):
+        for j in range(0, 3):
+            index = (i) * 3 + (j)
+            name = "Sensor: " + str(index)
+            tplot = PlotSensor(name = name,ylabel = "volt (U) ",xlabel = "Time", max = max_plot, ax = fh.add_subplot(3, 4, index),auto_plot=True)
+            hplots.append(tplot)
+            fh.subplots_adjust(hspace = 0.5)
+    stop = time.time()
+    print "Setup took : " + str(stop-start) + " seconds"
 
-        for i in range(0, 4):
-            for j in range(0, 3):
-                index = (i) * 3 + (j)
-                t = fh.add_subplot(3, 4, index)
-                t.set_xlabel("Time")
-                t.set_ylabel("Voltage(V)")
-                t.set_title("Sensor: " + str(index))
-                axhum.append(t)
+    #Start met JSON extractie en toevoeging aan de plot
+    for line in total:
+        start  = time.time()
+        print line
+        #iedere sensor heeft een statische plaats in de json string, moet aangepast worden als sensoren anders
+        #geinit() worden
 
-        stop = time.time()
-        print "Setup took : " + str(stop-start) + " seconds"
-        plt.ion()
-        for line in total:
-            print line
-            i  = i + 1
-            x.append(i)
-
-            #each sensor has it's static place in the json string
+        try:
             hum = line['Sensors'][0]['values']
             light =line['Sensors'][1]['values']
             temp =line['Sensors'][2]['values']
-            mass = line['Sensors'][3]['values']
+            weight = line['Sensors'][3]['values']
             ctime = line['Time']
             tlabel = label(pos = (0,-5,0), text ="Time: %s\n" % (ctime))
 
-            #change spheres according to list (12 elements)
-            definestaticradia(hum)
+        except:
+            print "JSON doesn't have correct formatting"
 
-            #complete lists, updated as progressing through playback
-            logtemp.append(temp)
-            loglight.append(light)
-            logback,logfront = zip(*loglight)
-            back,front = light
-            logmass.append(mass)
-            loghum.append(hum)
+        #verander de stralen van de bollen
+        definestaticradia(hum)
 
-            #plot points in a scatter fashion
-            # markers = ['-','v','^']
-            # colors  = ['b','r','r']
-            # [a.scatter(i,temp,marker = marker,color = color) for a,marker,color in zip(axes,markers,colors)]
+        #voeg elementen toe aan de axes
+        pltt.addy(temp[0])
+        pltw.addy(weight[0])
+        pltl.addy(light[0])
+        for plot,value in zip(hplots,hum):
+            plot.addy(value)
 
-            ax1.scatter(i, temp)
-            ax2.scatter(i, front, marker='v', color='r')
-            ax2.scatter(i, back, marker='^', color='r')
-            ax3.scatter(i, mass)
-            for index,item in enumerate(axhum):
-                item.scatter(i,hum[index])
 
-            #when paused, loop keeps waiting but GUI remains active
-            while pauzed:
-                plt.pause(0.001)
+        #when paused, loop keeps waiting but GUI remains active
+        while pauzed:
+            plt.pause(0.001)
+        print "waiting for pauze GUI"
 
-            #slider changes update interval
-            plt.pause(1/update_interval)
+        #slider changes update interval
+        stop = time.time() - start
+        print "plotting  values took {time}".format(time=stop)
+        plt.pause(1/update_interval)
 
-        print "end of file"
-        plt.close('all')
-    except Exception as e:
-        plt.close()
-        print e
+        [plot.remove() for plot in plots]
+        [plot.remove() for plot in hplots]
+
+    print "end of file"
+    plt.close('all')
 
 
 def changecamera():
     d = display.get_selected()
 
 if __name__== "__main__":
+
     createscene("Billy")
-    # playback("D:\VakantieJob 2017\Implementatie\graphBB\Values.txt")
     playback("./log/data.log")
 

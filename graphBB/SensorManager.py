@@ -1,21 +1,23 @@
-from Sensor import Humidity,Light,Temperature,Weight
-import time,json
+import json
 import logging
-logger = logging.getLogger('Sensor.manager')
+import time
 
-#todo : Toevoegen en verwijderen van de sensoren (vb vochtigheid) throws errors : programma naar de zak
+from Sensor import Humidity,Light,Temperature,Weight
+
+logger = logging.getLogger('Sensor.manager')
 
 class SensorManager():
     def __init__(self):
         self.dict = {}
         self.values = []
 
-        # self.h = (Humidity("0-12 Humidity Sensors"),'Humidity')
-        # self.l =  (Light("Front and Back light sensors"),'Light')
-        # self.t = (Temperature("Temperature sensor"),'Temperature')
+        #toevoegen van senoren : klasse init en toevoegen aan lijst 'senslist'
+        self.h = (Humidity("0-12 Humidity Sensors"),'Humidity')
+        self.l =  (Light("Front and Back light sensors"),'Light')
+        self.t = (Temperature("Temperature sensor"),'Temperature')
         self.w = (Weight("Weight load cell"),'Weight')
 
-        self.senslist = [self.w]
+        self.senslist = [self.h,self.l,self.t,self.w]
         self.sensors, self.types = zip(*self.senslist)
         self.monitor = Monitor(self.senslist)
 
@@ -44,6 +46,8 @@ class SensorManager():
         self.dict["Sensors"] = tl
         self.dict["Time"] = time.strftime("%Y-%m-%d %H:%M:%S")
         return json.dumps(self.dict)
+
+
 
 class Monitor:
     def __init__(self,sensors):

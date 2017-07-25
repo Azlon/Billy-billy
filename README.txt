@@ -41,14 +41,14 @@ In dit project:
             Deze klasse houdt alle sensoren bij en biedt alle sensorwaarden in een lijst aan.
             Het bijhouden van alle sensoren in 1 klasse vergemakkelijkt het opvragen van de bijhorende JSON strings.
 
-            vpython_pot
+            plotBB
             ***********
             Als er een text bestand met json waarden beschikbaar is en deze string een 'values' entry heeft, dan kunnen de
             vochtigheidswaarden via vpython (2000) lib grafisch dmv bollen weergegeven worden.
             Het toewijzen van de sensoren aan het bolmodel verloopt via de respectievelijke kanalen waarop de sensoren op
             zijn aangeslotenn. (vb Sensor 1 = kanaal 1,bord 1 , sensor 8 = kanaal 8,bord1,  sensor 9 = kanaal 1,bord 2, senor 12 = kanaal 4, bord 2)
 
-    Plotly_pot
+    plotly_pot.py
     **********
             Omdat de raspberry pi zonder monitor geen data kan plotten, wordt er gebruik gemaakt van online dataplatform, plot.ly.
             De mogelijkheden die het platform aanbiedt, overtreft in sommige gevallen zelfs matplotlib o.a in de streaming functionaliteit.
@@ -56,5 +56,16 @@ In dit project:
             De data die in elke afzonderlijke grafiek wordt afgebeeld is afhankelijk van de max_point instelling, waardoor monitoring in een
             zekere mate begrensd wordt.
 
+Hoe een logger werkt
+*******************
+1. logger object maken
+2. level instellen
+3. Handlers definiëren
+4. Formaat van bericht definiëren
+5. Handlers aan logger object toevoegen
+
+6. Logger berichten uit code (info,warning, critical, debug) aanroepen.
+
+Normaal gezien werkt logger ook vanuit meerdere modules, voorlopig blijkt die functionaliteit niet werkbaar.
 
 

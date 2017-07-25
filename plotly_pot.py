@@ -5,7 +5,9 @@ import plotly
 import plotly.plotly as py
 import plotly.tools as tools
 from plotly.graph_objs import Scatter, Figure
-from Graphic_Billy_Billy.SensorManager import SensorManager
+
+from graphBB.SensorManager import SensorManager
+
 
 class plotly_pot:
     def __init__(self,user=None):
@@ -73,7 +75,6 @@ class plotly_pot:
             pass
 
     def openStreams(self):
-
             fig = self.createFigure(3,4)
             print "figure made for sensors"
             wfig = Figure(data = [self.createwFigure()])
@@ -100,23 +101,25 @@ class plotly_pot:
                 i.close()
 
     def stream(self):
-            try:
-                self.openStreams()
+        """
+        Streamt de 12 vochtigheidswaarden naar bijhorende plots op plot.ly/consoleurl
+        Zolang de sensorwaarden sequentieel opgeslagen worden , blijft de stream functionaliteit werken.
+        :return:
+        """
 
-                while True:
-                    t = time.strftime("%H:%M:%S")
-                    print "self.man.getValByID(0): " + str(self.man.getValByID(0))
-                    for index, value in enumerate(self.man.getValByID(0)):
-                        self.streams[index].write({'x': t, 'y': value})
-                    self.streams[12].write({'x': t, 'y': self.man.getValByID(3)})
+        try:
+            self.openStreams()
 
-                    #heatmap
-                    # level = self.man.getvalues()[8:12]
-                    # self.streams[12].write({'z':level})
-                    time.sleep(0.5)
-            except Exception as e:
-                print e
-                self.closeStreams()
+            while True:
+                t = time.strftime("%H:%M:%S")
+                print "self.man.getValByID(0): " + str(self.man.getValByID(0))
+                for index, value in enumerate(self.man.getValByID(0)):
+                    self.streams[index].write({'x': t, 'y': value})
+                self.streams[12].write({'x': t, 'y': self.man.getValByID(3)})
+                time.sleep(0.5)
+        except Exception as e:
+            print e
+            self.closeStreams()
 
 if __name__ == "__main__":
     pot = plotly_pot()
