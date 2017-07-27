@@ -101,6 +101,13 @@ class Compensation:
 
 def compensate(temp, hum, tvc):
     # basis formule om de temperatuur naar 25 C terug te brengen
+    #tvc moet een floating point zijn!
+
+    print "temp vals: " + str(temp)
+    print "hum vals : " + str(hum)
+    print "Current TVC " + str(tvc)
+    tvc = float(tvc/100)
+
     return hum / (1 + tvc * (temp - 25))
 
 

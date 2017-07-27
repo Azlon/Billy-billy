@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger('sensor.instance.log')
 
 # Temperatuur compensatie
-from graphBB.Compensatie.condcompensate import Compensation
+from graphBB.Compensatie.compensate import Compensation
 
 class Sensor(object):
     '''
