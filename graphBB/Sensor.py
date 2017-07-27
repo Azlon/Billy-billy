@@ -13,6 +13,8 @@ import math
 import logging
 logger = logging.getLogger('sensor.instance.log')
 
+# Temperatuur compensatie
+from graphBB.Compensatie.condcompensate import Compensation
 
 class Sensor(object):
     '''
@@ -162,6 +164,7 @@ class Humidity(I2CSensor):
         self.adc1 = ADCPi(self.bus, self.adds[0], self.adds[1], 12)
         self.adc2 = ADCPi(self.bus, self.adds[2], self.adds[2], 12)
         self.dict.update(dict(driver="ABEL"))
+        self._depsens = None
 
     def read(self):
         tval = []
@@ -171,10 +174,18 @@ class Humidity(I2CSensor):
         for i in range(0, 4):
             tval.append(self.adc2.read_voltage(i + 1))
         self.values = tval
+        self.standarize()
         # print tval
         return tval
 
+    def standarize(self):
+        #Standariseert de vochtigheidswaarden.
+        if  isinstance(self._depsens,Temperature):
+            c = Compensation()
+            map(c.compensate,self.values)
 
+    def adddepsens(self,sobj):
+        self._depsens = sobj
 class Light(I2CSensor):
     '''
     Uitbreiding met licht sensoren met I2C als protocol. De sensoren communiceren met de ADS1x1 driver.

@@ -25,7 +25,7 @@ size_inc = 0.01         # incrementatie van de straal van de bollen in update()
 framerate = 50          # bovengrens van loop uitvoering / seconde
 update_interval = 2     # update interval
 max_size = 1.5          # maximale waarde waarvoor de bollen nog steeds groen uitslaan
-max_plot = 200          # maximaal aantal punten die op 1 grafiek (axes) mag getekend worden
+max_plot = 20          # maximaal aantal punten die op 1 grafiek (axes) mag getekend worden
 max_speed = 10          # Maximale snelheid van playback, zoals ook afgebeeld op de slider
 multiplier = 1.1        # Factor om vochtigheidswaarden te vergroten zodat bol volumes zichtbaar worden
 
@@ -610,7 +610,8 @@ def playback(filename, intval=1):
             name = "Sensor: " + str(index)
             tplot = PlotSensor(name = name,ylabel = "volt (U) ",xlabel = "Time", max = max_plot, ax = fh.add_subplot(3, 4, index),auto_plot=True)
             hplots.append(tplot)
-            fh.subplots_adjust(hspace = 0.5)
+            # fh.subplots_adjust(hspace = 0.5)
+    fh.tight_layout()
     stop = time.time()
     print "Setup took : " + str(stop-start) + " seconds"
 

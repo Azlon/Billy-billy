@@ -1,7 +1,7 @@
 try:
 
-    from ABE_helpers import ABEHelpers
-    from ABE_ADCPi import ADCPi
+    from graphBB.Drivers.ABEL import ABEHelpers
+    from graphBB.Drivers.ABEL import ADCPi
 except ImportError as e:
     print e
 import threading

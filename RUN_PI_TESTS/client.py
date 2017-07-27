@@ -1,5 +1,4 @@
 import socket
-import sys
 
 HOST, PORT = "192.168.0.86", 9999
 data = "Yes surreeee"

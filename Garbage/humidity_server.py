@@ -50,7 +50,7 @@ class serverThread(threading.Thread):
         server.serve_forever()
 
 if __name__ == "__main__":
-    from capture_humidity import SensorManager
+    from SensorManager import SensorManager
     man = SensorManager()
     HOST, PORT = "192.168.0.86", 9999
 

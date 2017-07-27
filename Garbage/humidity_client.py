@@ -1,6 +1,7 @@
-import socket,json
-import sys
+import json
+import socket
 import time
+
 HOST, PORT = "192.168.0.86", 9999
 
 # Create a socket (SOCK_STREAM means a TCP socket)

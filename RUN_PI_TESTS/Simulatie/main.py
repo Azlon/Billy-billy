@@ -1,7 +1,4 @@
-from capture_humidity import SensorManager
-import json
-import vpython_pot as pot
-import time
+from SensorManager import SensorManager
 play_intval= 1
 
 #get data from sensor and store in text file

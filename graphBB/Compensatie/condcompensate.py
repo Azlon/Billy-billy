@@ -20,38 +20,37 @@ drinkwater dat de conductiviteit 2% verandert per graad C. (0.02 / C).
 
 '''
 import logging
-import numpy
 import time
 
-from  graphBB.Sensor import Temperature,Humidity
+import numpy
 
-tsensor = Temperature("Core temperature")
-hsensor = Humidity("Humidity")
-
+try:
+    from  graphBB.Sensor import Temperature, Humidity
+    tsensor = Temperature("Core temperature")
+    hsensor = Humidity("Humidity")
+except Exception as e:
+    print e
 __LOGNAME__ = "Innerpotlog.log"
 __LOGDIR__ = "/log/" + __LOGNAME__
 __LOGMAXBYTES__ = 50000
 
+
 class Compensation:
     def __init__(self):
         try:
-            #initialiseren van de logger
+            # initialiseren van de logger
             self.corelog = logging.getLogger("core.temphumlog")
             self.corelog.setLevel(logging.DEBUG)
             rfl = logging.handlers.RotatingFileHandler(__LOGDIR__, max)
+
             rfl.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             self.corelog.addHandler(rfl)
         except Exception as e:
             print "No logger available: " + str(e)
         self.tvc = 0.0185
 
-    #todo: script schrijven om telkens humidity waarden terug te brengen naar die van 25 graden.
-    def compensate(self,temp,hum):
-        #basis formule om de temperatuur naar 25 C terug te brengen
-        return hum / (1 + self.tvc * (temp-25))
-
-    #opstellen van temperature/ conductiviteit coefficient
-    def __calcTVCgraph(self,tflag = False,degree = 1):
+    # opstellen van temperature/ conductiviteit coefficient
+    def __calcTVCgraph(self, tflag=False, degree=1, samples=-1):
         temp = []
         try:
             i = 0
@@ -60,24 +59,29 @@ class Compensation:
             self.corelog.info(mes)
             try:
                 while 1:
-                    i = i + 1
-                    th = (tsensor.getvalues()[0],hsensor.getvalues()[0])
+                    i += 1
+                    if samples <= i and samples != -1:
+                        raise KeyboardInterrupt
+                    th = (tsensor.getvalues()[0], hsensor.getvalues()[0])
                     temp.append(th)
-                    self.corelog.info("{i}:{tuple} at {time} ".format(i = i,tuple = str(th),time = time.strftime(time.time(),"%H:%M")))
+                    self.corelog.info(
+                        "{i}:{tuple} at {time} ".format(i=i, tuple=str(th), time=time.strftime(time.time(), "%H:%M")))
+                    print "{i}:{tuple} at {time} ".format(i=i, tuple=str(th), time=time.strftime(time.time(), "%H:%M"))
                     time.sleep(0.5)
             except Exception as e:
                 self.corelog.warning("Sensors are unavailable: " + str(e))
                 print e
+
         except KeyboardInterrupt:
-            x,y = zip(temp)
+            x, y = zip(*temp)
             x = numpy.asarray(x)
             y = numpy.asarray(y)
-            z = numpy.polyfit(x,y,degree)
+            z = numpy.polyfit(x, y, degree)
             return numpy.poly1d(z)
 
     def getgradient(self):
-        #process starten om coefficient te bepalen
-        z = self.__calcTVCgraph()[0]
+        # process starten om coefficient te bepalen
+        z = self.__calcTVCgraph()
         if len(z) == 2:
             print "Linear approximation"
             print "TVC : " + str(z[0])
@@ -85,20 +89,21 @@ class Compensation:
         return z
 
     def main(self):
-        #toepassen van de coefficient op verdere metingen
+        # toepassen van de coefficient op verdere metingen
         self.getgradient()
         while 1:
             x = tsensor.getvalues()
             y = hsensor.getvalues()
-            newy = self.compensate(x,y)
-            mes = "Compensated humidity (at {old} at {temp} degrees is {new}".format(old =y, temp = x, new = newy)
+            newy = compensate(x, y, self.tvc)
+            mes = "Compensated humidity (for {old}) at {temp} degrees is {new}".format(old=y, temp=x, new=newy)
             self.corelog.info(mes)
+
+
+def compensate(temp, hum, tvc):
+    # basis formule om de temperatuur naar 25 C terug te brengen
+    return hum / (1 + tvc * (temp - 25))
 
 
 if __name__ == "__main__":
     c = Compensation()
     c.main()
-
-
-
-
